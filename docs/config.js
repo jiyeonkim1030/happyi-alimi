@@ -1,3 +1,3 @@
 window.HAPPI_CONFIG = {
-  oneSignalAppId: "PASTE_ONESIGNAL_APP_ID_HERE"
+  oneSignalAppId: "cfafacbd-6ca5-4930-bd7d-2c7de386ceca"
 };
