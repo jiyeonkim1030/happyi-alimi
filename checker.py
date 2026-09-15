@@ -20,6 +20,10 @@ BOARDS = {
 }
 
 STATE_FILE = Path(".state/seen.json")
+
+STATE_DIR = Path(".state")
+STATE_DIR.mkdir(parents=True, exist_ok=True)
+
 HEARTBEAT_FILE = Path(".state/heartbeat.txt")
 
 POST_ID_PATTERNS = [
