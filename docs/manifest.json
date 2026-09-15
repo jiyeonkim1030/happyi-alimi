@@ -1,6 +1,6 @@
 {
   "name": "해피아이 알리미",
-  "short_name": "해피아이",
+  "short_name": "해피아이 알리미",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
