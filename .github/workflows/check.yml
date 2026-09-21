@@ -42,7 +42,7 @@ jobs:
           PAGES_URL: ${{ secrets.PAGES_URL }}
         run: python checker.py
 
-          - name: Save checker state
+      - name: Save checker state
         run: |
           git config user.name "happyi-bot"
           git config user.email "happyi-bot@users.noreply.github.com"
