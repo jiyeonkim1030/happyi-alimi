@@ -205,6 +205,8 @@ def main():
                     timeout=30000,
                 )
                 posts = parse_posts(page.content(), info["boardID"])
+                print(f"[{board}] Found posts: {len(posts)} | Latest: {posts[:3]}")
+
 
                 current_hashes = [post_hash(board, p["id"]) for p in posts]
                 previous = set(state.get(board, []))
