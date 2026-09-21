@@ -42,14 +42,14 @@ jobs:
           PAGES_URL: ${{ secrets.PAGES_URL }}
         run: python checker.py
 
-      - name: Save checker state
+          - name: Save checker state
         run: |
-          if git diff --quiet -- .state; then
+          git config user.name "happyi-bot"
+          git config user.email "happyi-bot@users.noreply.github.com"
+          git add -f .state
+          if git diff --cached --quiet; then
             echo "No state changes."
             exit 0
           fi
-          git config user.name "happyi-bot"
-          git config user.email "happyi-bot@users.noreply.github.com"
-          git add .state
           git commit -m "Update checker state [skip ci]"
           git push
