@@ -19,17 +19,17 @@ BOARDS = {
     "오늘의 식단": {"pageCode": 32, "boardID": "www32"},
 }
 
-STATE_FILE = Path(".state/seen.json")
-
 STATE_DIR = Path(".state")
 STATE_DIR.mkdir(parents=True, exist_ok=True)
 
-HEARTBEAT_FILE = Path(".state/heartbeat.txt")
+STATE_FILE = STATE_DIR / "seen.json"
+HEARTBEAT_FILE = STATE_DIR / "heartbeat.txt"
 
 POST_ID_PATTERNS = [
     re.compile(r"permitCheck\('beforeview',\s*'(\d+)'"),
     re.compile(r"[?&]num=(\d+)"),
 ]
+
 DATE_RE = re.compile(r"\b20\d{2}[.\-/]\d{2}[.\-/]\d{2}\b")
 
 
@@ -41,22 +41,30 @@ def required_env(name):
 
 
 def post_hash(board, post_id):
-    return hashlib.sha256(f"{board}:{post_id}".encode("utf-8")).hexdigest()
+    return hashlib.sha256(
+        f"{board}:{post_id}".encode("utf-8")
+    ).hexdigest()
 
 
 def load_state():
     if not STATE_FILE.exists():
         return {}
+
     try:
-        return json.loads(STATE_FILE.read_text(encoding="utf-8"))
+        return json.loads(
+            STATE_FILE.read_text(encoding="utf-8")
+        )
     except Exception:
         return {}
 
 
 def save_state(state):
-    STATE_FILE.parent.mkdir(exist_ok=True)
     STATE_FILE.write_text(
-        json.dumps(state, ensure_ascii=False, indent=2),
+        json.dumps(
+            state,
+            ensure_ascii=False,
+            indent=2,
+        ),
         encoding="utf-8",
     )
 
@@ -64,41 +72,66 @@ def save_state(state):
 def touch_heartbeat():
     """Keep scheduled workflow from going inactive on a public repo."""
     from datetime import datetime, timezone
+
     now = datetime.now(timezone.utc)
     should_write = True
+
     if HEARTBEAT_FILE.exists():
         try:
-            old = datetime.fromisoformat(HEARTBEAT_FILE.read_text().strip())
+            old = datetime.fromisoformat(
+                HEARTBEAT_FILE.read_text().strip()
+            )
             should_write = (now - old).days >= 30
         except Exception:
             pass
+
     if should_write:
-        HEARTBEAT_FILE.write_text(now.isoformat(), encoding="utf-8")
+        HEARTBEAT_FILE.write_text(
+            now.isoformat(),
+            encoding="utf-8",
+        )
 
 
 def extract_post_id(tag):
-    text = (tag.get("onclick", "") or "") + " " + (tag.get("href", "") or "")
+    text = (
+        (tag.get("onclick", "") or "")
+        + " "
+        + (tag.get("href", "") or "")
+    )
+
     for pat in POST_ID_PATTERNS:
         m = pat.search(text)
         if m:
             return m.group(1)
+
     return None
 
 
 def find_date_near(tag):
     tr = tag.find_parent("tr")
+
     if tr:
-        m = DATE_RE.search(tr.get_text(" ", strip=True))
+        m = DATE_RE.search(
+            tr.get_text(" ", strip=True)
+        )
         if m:
             return m.group(0)
+
     parent = tag.parent
+
     for _ in range(6):
         if not parent:
             break
-        m = DATE_RE.search(parent.get_text(" ", strip=True))
+
+        m = DATE_RE.search(
+            parent.get_text(" ", strip=True)
+        )
+
         if m:
             return m.group(0)
+
         parent = parent.parent
+
     return ""
 
 
@@ -108,49 +141,103 @@ def parse_posts(html, board_id):
 
     for a in soup.find_all("a"):
         post_id = extract_post_id(a)
+
         if not post_id:
             continue
 
         title = a.get_text(" ", strip=True)
-        if not title or title in {"다운로드", "이전", "다음"}:
+
+        if not title or title in {
+            "다운로드",
+            "이전",
+            "다음",
+        }:
             continue
 
         href = a.get("href", "") or ""
+
         detail_url = (
             urljoin(BASE, href)
-            if href and not href.lower().startswith("javascript:")
-            else f"{BASE}/main/sub.html?Mode=view&boardID={board_id}&num={post_id}&page=0&keyfield=&key=&bCate="
+            if href
+            and not href.lower().startswith("javascript:")
+            else (
+                f"{BASE}/main/sub.html"
+                f"?Mode=view"
+                f"&boardID={board_id}"
+                f"&num={post_id}"
+                f"&page=0"
+                f"&keyfield="
+                f"&key="
+                f"&bCate="
+            )
         )
 
-        found.setdefault(post_id, {
-            "id": post_id,
-            "title": title,
-            "date": find_date_near(a),
-            "url": detail_url,
-        })
+        found.setdefault(
+            post_id,
+            {
+                "id": post_id,
+                "title": title,
+                "date": find_date_near(a),
+                "url": detail_url,
+            },
+        )
 
-    return sorted(found.values(), key=lambda x: int(x["id"]), reverse=True)
+    return sorted(
+        found.values(),
+        key=lambda x: int(x["id"]),
+        reverse=True,
+    )
 
 
 def login(context, user_id, password):
     page = context.new_page()
-    page.goto(LOGIN_URL, wait_until="domcontentloaded", timeout=30000)
-    page.locator('input[name="id"]').fill(user_id)
-    page.locator('input[name="password"]').fill(password)
+
+    page.goto(
+        LOGIN_URL,
+        wait_until="domcontentloaded",
+        timeout=30000,
+    )
+
+    page.locator(
+        'input[name="id"]'
+    ).fill(user_id)
+
+    page.locator(
+        'input[name="password"]'
+    ).fill(password)
+
     page.locator("#loginBtn").click()
+
     time.sleep(3)
 
     test = context.new_page()
-    test.goto(BASE + "/main/sub.html?pageCode=54",
-              wait_until="domcontentloaded", timeout=30000)
+
+    test.goto(
+        BASE + "/main/sub.html?pageCode=54",
+        wait_until="domcontentloaded",
+        timeout=30000,
+    )
+
     html = test.content()
 
-    if "logout.php" not in html and "로그아웃" not in html:
-        raise RuntimeError("Could not confirm kindergarten login.")
+    if (
+        "logout.php" not in html
+        and "로그아웃" not in html
+    ):
+        raise RuntimeError(
+            "Could not confirm kindergarten login."
+        )
+
     return test
 
 
-def send_push(app_id, api_key, pages_url, board, post):
+def send_push(
+    app_id,
+    api_key,
+    pages_url,
+    board,
+    post,
+):
     target = (
         f"{pages_url.rstrip('/')}/"
         f"?board={quote(board)}"
@@ -161,13 +248,24 @@ def send_push(app_id, api_key, pages_url, board, post):
     payload = {
         "app_id": app_id,
         "target_channel": "push",
-        "included_segments": ["Subscribed Users"],
-        "headings": {"en": f"해피아이 · {board}"},
-        "contents": {"en": post["title"]},
+        "included_segments": [
+            "Subscribed Users"
+        ],
+        "headings": {
+            "en": f"해피아이 · {board}"
+        },
+        "contents": {
+            "en": post["title"]
+        },
         "url": target,
     }
 
-    print(f"[PUSH START] {board} | ID={post['id']} | {post['title']}")
+    print(
+        f"[PUSH START] "
+        f"{board} | "
+        f"ID={post['id']} | "
+        f"{post['title']}"
+    )
 
     r = requests.post(
         "https://api.onesignal.com/notifications",
@@ -179,71 +277,155 @@ def send_push(app_id, api_key, pages_url, board, post):
         timeout=30,
     )
 
-    print(f"[ONESIGNAL] status={r.status_code} | response={r.text}")
+    print(
+        f"[ONESIGNAL] "
+        f"status={r.status_code} | "
+        f"response={r.text}"
+    )
+
     r.raise_for_status()
 
 
 def main():
     user_id = required_env("HAPPI_ID")
     password = required_env("HAPPI_PASSWORD")
-    os_app_id = required_env("ONESIGNAL_APP_ID")
-    os_api_key = required_env("ONESIGNAL_API_KEY")
-    pages_url = required_env("PAGES_URL")
+
+    os_app_id = required_env(
+        "ONESIGNAL_APP_ID"
+    )
+
+    os_api_key = required_env(
+        "ONESIGNAL_API_KEY"
+    )
+
+    pages_url = required_env(
+        "PAGES_URL"
+    )
 
     state = load_state()
     touch_heartbeat()
 
     with sync_playwright() as p:
-        browser = p.chromium.launch(headless=True)
-        context = browser.new_context(locale="ko-KR")
+        browser = p.chromium.launch(
+            headless=True
+        )
+
+        context = browser.new_context(
+            locale="ko-KR"
+        )
 
         try:
-            page = login(context, user_id, password)
+            page = login(
+                context,
+                user_id,
+                password,
+            )
+
             new_state = dict(state)
             total_new = 0
 
             for board, info in BOARDS.items():
                 page.goto(
-                    f"{BASE}/main/sub.html?pageCode={info['pageCode']}",
+                    (
+                        f"{BASE}/main/sub.html"
+                        f"?pageCode={info['pageCode']}"
+                    ),
                     wait_until="domcontentloaded",
                     timeout=30000,
                 )
-                posts = parse_posts(page.content(), info["boardID"])
-                print(f"[{board}] Found posts: {len(posts)} | Latest: {posts[:3]}")
 
+                posts = parse_posts(
+                    page.content(),
+                    info["boardID"],
+                )
 
-                current_hashes = [post_hash(board, p["id"]) for p in posts]
-                previous = set(state.get(board, []))
+                print(
+                    f"[{board}] "
+                    f"Found posts: {len(posts)} | "
+                    f"Latest: {posts[:3]}"
+                )
+
+                current_hashes = [
+                    post_hash(
+                        board,
+                        post["id"],
+                    )
+                    for post in posts
+                ]
+
+                previous = set(
+                    state.get(board, [])
+                )
 
                 if board not in state:
-                    # First cloud run becomes baseline; no old-post notification storm.
                     new_posts = []
-                    print(f"[{board}] BASELINE - no previous state")
+
+                    print(
+                        f"[{board}] "
+                        "BASELINE - "
+                        "no previous state"
+                    )
+
                 else:
                     new_posts = [
-                        post for post in posts
-                        if post_hash(board, post["id"]) not in previous
+                        post
+                        for post in posts
+                        if post_hash(
+                            board,
+                            post["id"],
+                        )
+                        not in previous
                     ]
 
-                    latest = posts[0] if posts else None
+                    latest = (
+                        posts[0]
+                        if posts
+                        else None
+                    )
+
                     if latest:
-                        latest_seen = post_hash(board, latest["id"]) in previous
+                        latest_seen = (
+                            post_hash(
+                                board,
+                                latest["id"],
+                            )
+                            in previous
+                        )
+
                         print(
-                            f"[{board}] Latest ID={latest['id']} | "
+                            f"[{board}] "
+                            f"Latest ID={latest['id']} | "
                             f"title={latest['title']} | "
                             f"seen={latest_seen} | "
                             f"new_posts={len(new_posts)}"
                         )
 
                 for post in reversed(new_posts):
-                    send_push(os_app_id, os_api_key, pages_url, board, post)
+                    send_push(
+                        os_app_id,
+                        os_api_key,
+                        pages_url,
+                        board,
+                        post,
+                    )
+
                     total_new += 1
 
-                merged = list(dict.fromkeys(current_hashes + list(previous)))[:250]
+                merged = list(
+                    dict.fromkeys(
+                        current_hashes
+                        + list(previous)
+                    )
+                )[:250]
+
                 new_state[board] = merged
 
             save_state(new_state)
-            print(f"Check completed. New posts: {total_new}")
+
+            print(
+                f"Check completed. "
+                f"New posts: {total_new}"
+            )
 
         finally:
             browser.close()
@@ -252,5 +434,8 @@ def main():
 if __name__ == "__main__":
     try:
         main()
+
     except PlaywrightTimeoutError:
-        raise SystemExit("Kindergarten site timed out.")
+        raise SystemExit(
+            "Kindergarten site timed out."
+        )
