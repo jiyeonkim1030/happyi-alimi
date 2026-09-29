@@ -167,7 +167,7 @@ def send_push(app_id, api_key, pages_url, board, post):
         "url": target,
     }
 
-      print(f"[PUSH START] {board} | ID={post['id']} | {post['title']}")
+    print(f"[PUSH START] {board} | ID={post['id']} | {post['title']}")
 
     r = requests.post(
         "https://api.onesignal.com/notifications",
@@ -215,7 +215,7 @@ def main():
                 current_hashes = [post_hash(board, p["id"]) for p in posts]
                 previous = set(state.get(board, []))
 
-                               if board not in state:
+                if board not in state:
                     # First cloud run becomes baseline; no old-post notification storm.
                     new_posts = []
                     print(f"[{board}] BASELINE - no previous state")
